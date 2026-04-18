@@ -1,0 +1,65 @@
+---
+- name: Get latest starship release from GitHub
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/starship/starship/releases/latest
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      User-Agent: "ansible-jays-remote-lab"
+  register: starship_release
+
+- name: Set starship latest version fact
+  ansible.builtin.set_fact:
+    starship_latest: "{{ starship_release.json.tag_name }}"
+
+- name: Read installed starship version marker
+  ansible.builtin.slurp:
+    src: "{{ ansible_version_dir }}/starship"
+  register: starship_version_file
+  failed_when: false
+
+- name: Install or update starship
+  when: >
+    starship_version_file.failed or
+    (starship_version_file.content | b64decode | trim) != starship_latest
+  block:
+    - name: Download starship archive
+      ansible.builtin.get_url:
+        url: "https://github.com/starship/starship/releases/download/{{ starship_latest }}/starship-x86_64-unknown-linux-gnu.tar.gz"
+        dest: /tmp/starship.tar.gz
+        mode: "0644"
+
+    - name: Extract starship binary
+      ansible.builtin.unarchive:
+        src: /tmp/starship.tar.gz
+        dest: "{{ starship_install_dir }}"
+        remote_src: true
+        mode: "0755"
+
+    - name: Remove starship archive
+      ansible.builtin.file:
+        path: /tmp/starship.tar.gz
+        state: absent
+
+    - name: Save installed starship version marker
+      ansible.builtin.copy:
+        content: "{{ starship_latest }}"
+        dest: "{{ ansible_version_dir }}/starship"
+        mode: "0644"
+
+- name: Ensure .config directory exists for user
+  ansible.builtin.file:
+    path: "{{ vps_home }}/.config"
+    state: directory
+    owner: "{{ vps_user }}"
+    group: "{{ vps_user }}"
+    mode: "0755"
+
+- name: Add starship initialization to .bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ vps_home }}/.bashrc"
+    line: 'eval "$(starship init bash)"'
+    state: present
+    create: true
+    owner: "{{ vps_user }}"
+    group: "{{ vps_user }}"
+    mode: "0644"

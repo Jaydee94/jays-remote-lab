@@ -1,0 +1,5 @@
+---
+llama_cpp_github_owner: ggml-org
+llama_cpp_github_repo: llama.cpp
+llama_cpp_install_dir: /usr/local/bin
+llama_cpp_lib_dir: /usr/local/lib/llama-cpp

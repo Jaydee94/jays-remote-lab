@@ -1,0 +1,22 @@
+[Unit]
+Description=Paperclip AI Agent Orchestrator
+Documentation=https://github.com/paperclipai/paperclip
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ paperclip_user }}
+Group={{ paperclip_group }}
+WorkingDirectory={{ paperclip_data_dir }}
+EnvironmentFile={{ paperclip_data_dir }}/.env
+ExecStart=/usr/local/bin/paperclipai onboard --yes
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=paperclip
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

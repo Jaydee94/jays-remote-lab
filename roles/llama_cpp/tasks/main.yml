@@ -1,0 +1,111 @@
+---
+- name: Install llama.cpp runtime dependencies
+  ansible.builtin.apt:
+    name:
+      - libgomp1
+    state: present
+
+- name: Get latest llama.cpp release from GitHub
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ llama_cpp_github_owner }}/{{ llama_cpp_github_repo }}/releases/latest"
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      User-Agent: "ansible-jays-remote-lab"
+  register: llama_cpp_release
+
+- name: Set llama.cpp latest version fact
+  ansible.builtin.set_fact:
+    llama_cpp_latest: "{{ llama_cpp_release.json.tag_name }}"
+
+- name: Find Ubuntu x64 binary asset
+  ansible.builtin.set_fact:
+    llama_cpp_asset: >-
+      {{ llama_cpp_release.json.assets
+         | selectattr('name', 'search', 'ubuntu.*x64')
+         | list | first | default({}) }}
+
+- name: Read installed llama.cpp version marker
+  ansible.builtin.slurp:
+    src: "{{ ansible_version_dir }}/llama_cpp"
+  register: llama_cpp_version_file
+  failed_when: false
+
+- name: Install or update llama.cpp
+  when: >
+    llama_cpp_asset.browser_download_url is defined and
+    (llama_cpp_version_file.failed or
+     (llama_cpp_version_file.content | b64decode | trim) != llama_cpp_latest)
+  block:
+    - name: Download llama.cpp binary archive
+      ansible.builtin.get_url:
+        url: "{{ llama_cpp_asset.browser_download_url }}"
+        dest: /tmp/llama_cpp.zip
+        mode: "0644"
+
+    - name: Ensure extraction directory is clean
+      ansible.builtin.file:
+        path: /tmp/llama_cpp_extract
+        state: absent
+
+    - name: Create extraction directory
+      ansible.builtin.file:
+        path: /tmp/llama_cpp_extract
+        state: directory
+        mode: "0755"
+
+    - name: Extract llama.cpp archive
+      ansible.builtin.unarchive:
+        src: /tmp/llama_cpp.zip
+        dest: /tmp/llama_cpp_extract
+        remote_src: true
+
+    - name: Ensure llama.cpp lib directory exists
+      ansible.builtin.file:
+        path: "{{ llama_cpp_lib_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install llama.cpp executables to bin directory
+      ansible.builtin.shell: |
+        find /tmp/llama_cpp_extract -type f \
+          \( -name "llama-cli" -o -name "llama-server" \
+             -o -name "llama-quantize" -o -name "llama-bench" \) | \
+        while read -r f; do
+          install -m 755 "$f" "{{ llama_cpp_install_dir }}/"
+        done
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Install llama.cpp shared libraries
+      ansible.builtin.shell: |
+        find /tmp/llama_cpp_extract -type f -name "*.so*" | \
+        while read -r f; do
+          install -m 644 "$f" "{{ llama_cpp_lib_dir }}/"
+        done
+        ldconfig
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up llama.cpp temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/llama_cpp.zip
+        - /tmp/llama_cpp_extract
+
+    - name: Save installed llama.cpp version marker
+      ansible.builtin.copy:
+        content: "{{ llama_cpp_latest }}"
+        dest: "{{ ansible_version_dir }}/llama_cpp"
+        mode: "0644"
+
+- name: Warn if no Ubuntu x64 asset was found
+  ansible.builtin.debug:
+    msg: >
+      No Ubuntu x64 pre-built binary found for llama.cpp {{ llama_cpp_latest }}.
+      Check https://github.com/{{ llama_cpp_github_owner }}/{{ llama_cpp_github_repo }}/releases
+      for available assets and adjust the search pattern in this role if needed.
+  when: llama_cpp_asset.browser_download_url is not defined

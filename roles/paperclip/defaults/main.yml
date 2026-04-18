@@ -1,0 +1,23 @@
+---
+# Node.js major version to install from NodeSource
+paperclip_node_version: "20"
+
+# TCP port Paperclip listens on
+paperclip_port: 3100
+
+# Public URL that Paperclip advertises (change to your domain / IP)
+paperclip_public_url: "http://{{ ansible_host }}:{{ paperclip_port }}"
+
+# Data directory where Paperclip stores its embedded DB, uploads, etc.
+paperclip_data_dir: /opt/paperclip/data
+
+# System user that owns the service
+paperclip_user: "{{ vps_user }}"
+paperclip_group: "{{ vps_user }}"
+
+# If set, this secret is used; if empty a random one is generated on first install.
+# Recommended: store a real value in Ansible Vault and override here.
+# Example (group_vars/all.yml or host_vars/vps.yml):
+#   paperclip_better_auth_secret: !vault |
+#     $ANSIBLE_VAULT;1.1;AES256...
+paperclip_better_auth_secret: ""
