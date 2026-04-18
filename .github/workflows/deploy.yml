@@ -12,18 +12,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Setup SSH known_hosts
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H 85.215.129.251 >> ~/.ssh/known_hosts
 
-      - name: Install Ansible
-        run: pip install ansible
+      - name: Install Ansible and sshpass
+        run: |
+          pip install ansible
+          sudo apt-get install -y sshpass
 
       - name: Run Ansible playbook
         run: |
           ansible-playbook site.yml \
-            --private-key ~/.ssh/id_ed25519 \
-            --extra-vars "ansible_become_pass=${{ secrets.ANSIBLE_BECOME_PASS }}"
+            --extra-vars "ansible_password=${{ secrets.ANSIBLE_BECOME_PASS }} ansible_become_pass=${{ secrets.ANSIBLE_BECOME_PASS }}"
