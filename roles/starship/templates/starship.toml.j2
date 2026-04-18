@@ -1,0 +1,45 @@
+# Starship configuration for {{ vps_user }}
+# https://starship.rs/config/
+
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_status\
+$python\
+$nodejs\
+$rust\
+$cmd_duration\
+$line_break\
+$character"""
+
+[username]
+show_always = true
+format = "[$user]($style) "
+style_user = "bold green"
+style_root = "bold red"
+
+[hostname]
+ssh_only = false
+format = "[@$hostname]($style) "
+style = "bold cyan"
+
+[directory]
+truncation_length = 4
+truncate_to_repo = true
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+symbol = " "
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[cmd_duration]
+min_time = 2_000
+format = "took [$duration]($style) "

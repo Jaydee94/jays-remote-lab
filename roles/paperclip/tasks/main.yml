@@ -84,7 +84,7 @@
   ansible.builtin.slurp:
     src: "{{ paperclip_data_dir }}/.auth_secret"
   register: paperclip_existing_secret
-  failed_when: false
+  ignore_errors: true
 
 - name: Generate a random auth secret when none is configured
   ansible.builtin.set_fact:

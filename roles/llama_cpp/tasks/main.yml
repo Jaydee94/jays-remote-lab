@@ -28,7 +28,7 @@
   ansible.builtin.slurp:
     src: "{{ ansible_version_dir }}/llama_cpp"
   register: llama_cpp_version_file
-  failed_when: false
+  ignore_errors: true
 
 - name: Install or update llama.cpp
   when: >

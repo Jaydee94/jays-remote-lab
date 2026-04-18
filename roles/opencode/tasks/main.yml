@@ -22,7 +22,7 @@
   ansible.builtin.slurp:
     src: "{{ ansible_version_dir }}/opencode"
   register: opencode_version_file
-  failed_when: false
+  ignore_errors: true
 
 - name: Install or update opencode
   when: >

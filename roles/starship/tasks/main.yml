@@ -1,21 +1,21 @@
 ---
-- name: Get latest starship release from GitHub
+- name: Get recent starship releases from GitHub
   ansible.builtin.uri:
-    url: https://api.github.com/repos/starship/starship/releases/latest
+    url: https://api.github.com/repos/starship/starship/releases?per_page=5
     headers:
       Accept: "application/vnd.github.v3+json"
       User-Agent: "ansible-jays-remote-lab"
-  register: starship_release
+  register: starship_releases
 
-- name: Set starship latest version fact
+- name: Set starship latest version fact (first release with assets)
   ansible.builtin.set_fact:
-    starship_latest: "{{ starship_release.json.tag_name }}"
+    starship_latest: "{{ (starship_releases.json | selectattr('assets', 'ne', []) | first).tag_name }}"
 
 - name: Read installed starship version marker
   ansible.builtin.slurp:
     src: "{{ ansible_version_dir }}/starship"
   register: starship_version_file
-  failed_when: false
+  ignore_errors: true
 
 - name: Install or update starship
   when: >
@@ -54,10 +54,28 @@
     group: "{{ vps_user }}"
     mode: "0755"
 
+- name: Deploy starship configuration
+  ansible.builtin.template:
+    src: starship.toml.j2
+    dest: "{{ vps_home }}/.config/starship.toml"
+    owner: "{{ vps_user }}"
+    group: "{{ vps_user }}"
+    mode: "0644"
+
 - name: Add starship initialization to .bashrc
   ansible.builtin.lineinfile:
     path: "{{ vps_home }}/.bashrc"
     line: 'eval "$(starship init bash)"'
+    state: present
+    create: true
+    owner: "{{ vps_user }}"
+    group: "{{ vps_user }}"
+    mode: "0644"
+
+- name: Ensure .bashrc is sourced from .bash_profile
+  ansible.builtin.lineinfile:
+    path: "{{ vps_home }}/.bash_profile"
+    line: '[[ -f ~/.bashrc ]] && source ~/.bashrc'
     state: present
     create: true
     owner: "{{ vps_user }}"

@@ -32,6 +32,13 @@ Auf deinem lokalen Rechner (nicht auf dem VPS):
 
 ## Loslegen
 
+### 0. Passwordloses sudo einrichten (einmalig)
+
+Ansible benötigt sudo-Rechte ohne Passwort. Als root auf dem VPS ausführen:
+```bash
+ssh root@85.215.129.251 "echo 'jaydee ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/jaydee && chmod 440 /etc/sudoers.d/jaydee"
+```
+
 ### 1. Repo klonen
 ```bash
 git clone <repo-url>
@@ -184,9 +191,9 @@ Für apt-Pakete (Ubuntu, podman) wird bei jedem Lauf `apt dist-upgrade` ausgefü
 ```bash
 ssh jaydee@85.215.129.251 "sudo id"
 ```
-Falls nicht, füge den User zur sudoers hinzu:  
+Falls nicht, füge den User zur sudoers hinzu (als root einloggen):  
 ```bash
-echo "jaydee ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/jaydee
+ssh root@85.215.129.251 "echo 'jaydee ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/jaydee && chmod 440 /etc/sudoers.d/jaydee"
 ```
 
 **Ich sehe „No Ubuntu x64 asset found for llama.cpp".**  
