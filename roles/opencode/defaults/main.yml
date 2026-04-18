@@ -1,0 +1,7 @@
+---
+opencode_github_owner: opencode-ai
+opencode_github_repo: opencode
+opencode_install_dir: /usr/local/bin
+# Asset search pattern for the Linux amd64 binary.
+# Adjust if the release naming convention changes.
+opencode_asset_pattern: "linux.*x86_64"

@@ -1,0 +1,7 @@
+---
+paperclip_github_owner: nicowillis
+paperclip_github_repo: paperclip
+paperclip_install_dir: /usr/local/bin
+# Asset search pattern for the Linux amd64 binary.
+# Adjust if the release naming convention changes.
+paperclip_asset_pattern: "linux.*amd64|linux.*x86_64"

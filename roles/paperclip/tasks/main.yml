@@ -1,0 +1,128 @@
+---
+- name: Get latest paperclip release from GitHub
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ paperclip_github_owner }}/{{ paperclip_github_repo }}/releases/latest"
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      User-Agent: "ansible-jays-remote-lab"
+  register: paperclip_release
+
+- name: Set paperclip latest version fact
+  ansible.builtin.set_fact:
+    paperclip_latest: "{{ paperclip_release.json.tag_name }}"
+
+- name: Find Linux binary asset
+  ansible.builtin.set_fact:
+    paperclip_asset: >-
+      {{ paperclip_release.json.assets
+         | selectattr('name', 'search', paperclip_asset_pattern)
+         | list | first | default({}) }}
+
+- name: Read installed paperclip version marker
+  ansible.builtin.slurp:
+    src: "{{ ansible_version_dir }}/paperclip"
+  register: paperclip_version_file
+  failed_when: false
+
+- name: Install or update paperclip
+  when: >
+    paperclip_asset.browser_download_url is defined and
+    (paperclip_version_file.failed or
+     (paperclip_version_file.content | b64decode | trim) != paperclip_latest)
+  block:
+    - name: Download paperclip asset
+      ansible.builtin.get_url:
+        url: "{{ paperclip_asset.browser_download_url }}"
+        dest: "/tmp/{{ paperclip_asset.name }}"
+        mode: "0644"
+
+    - name: Extract paperclip archive (tar.gz / tgz)
+      when: paperclip_asset.name is search('\\.tar\\.gz$|\\.tgz$')
+      block:
+        - name: Create extraction directory
+          ansible.builtin.file:
+            path: /tmp/paperclip_extract
+            state: directory
+            mode: "0755"
+
+        - name: Extract tar archive
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ paperclip_asset.name }}"
+            dest: /tmp/paperclip_extract
+            remote_src: true
+
+        - name: Install paperclip binary from archive
+          ansible.builtin.shell: |
+            binary=$(find /tmp/paperclip_extract -type f -name "paperclip" | head -1)
+            if [ -z "$binary" ]; then
+              echo "ERROR: paperclip binary not found in extracted archive" >&2
+              exit 1
+            fi
+            install -m 755 "$binary" "{{ paperclip_install_dir }}/paperclip"
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Clean up extraction directory
+          ansible.builtin.file:
+            path: /tmp/paperclip_extract
+            state: absent
+
+    - name: Extract paperclip archive (zip)
+      when: paperclip_asset.name is search('\\.zip$')
+      block:
+        - name: Create extraction directory
+          ansible.builtin.file:
+            path: /tmp/paperclip_extract
+            state: directory
+            mode: "0755"
+
+        - name: Extract zip archive
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ paperclip_asset.name }}"
+            dest: /tmp/paperclip_extract
+            remote_src: true
+
+        - name: Install paperclip binary from archive
+          ansible.builtin.shell: |
+            binary=$(find /tmp/paperclip_extract -type f -name "paperclip" | head -1)
+            if [ -z "$binary" ]; then
+              echo "ERROR: paperclip binary not found in extracted archive" >&2
+              exit 1
+            fi
+            install -m 755 "$binary" "{{ paperclip_install_dir }}/paperclip"
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Clean up extraction directory
+          ansible.builtin.file:
+            path: /tmp/paperclip_extract
+            state: absent
+
+    - name: Install paperclip plain binary directly
+      when: not (paperclip_asset.name is search('\\.(tar\\.gz|tgz|zip)$'))
+      ansible.builtin.copy:
+        src: "/tmp/{{ paperclip_asset.name }}"
+        dest: "{{ paperclip_install_dir }}/paperclip"
+        remote_src: true
+        mode: "0755"
+
+    - name: Remove downloaded asset
+      ansible.builtin.file:
+        path: "/tmp/{{ paperclip_asset.name }}"
+        state: absent
+
+    - name: Save installed paperclip version marker
+      ansible.builtin.copy:
+        content: "{{ paperclip_latest }}"
+        dest: "{{ ansible_version_dir }}/paperclip"
+        mode: "0644"
+
+- name: Warn if no matching asset was found
+  ansible.builtin.debug:
+    msg: >
+      No Linux asset found for paperclip {{ paperclip_latest }}.
+      Check https://github.com/{{ paperclip_github_owner }}/{{ paperclip_github_repo }}/releases
+      and adjust paperclip_asset_pattern in roles/paperclip/defaults/main.yml if needed.
+  when: paperclip_asset.browser_download_url is not defined

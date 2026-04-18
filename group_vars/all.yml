@@ -1,0 +1,8 @@
+---
+# System user that owns the VPS shell environment
+vps_user: jaydee
+vps_home: /home/jaydee
+
+# Directory where Ansible stores installed-version markers
+# Used to detect when a GitHub-release tool needs an update
+ansible_version_dir: /usr/local/share/ansible-versions

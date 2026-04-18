@@ -1,0 +1,128 @@
+---
+- name: Get latest opencode release from GitHub
+  ansible.builtin.uri:
+    url: "https://api.github.com/repos/{{ opencode_github_owner }}/{{ opencode_github_repo }}/releases/latest"
+    headers:
+      Accept: "application/vnd.github.v3+json"
+      User-Agent: "ansible-jays-remote-lab"
+  register: opencode_release
+
+- name: Set opencode latest version fact
+  ansible.builtin.set_fact:
+    opencode_latest: "{{ opencode_release.json.tag_name }}"
+
+- name: Find Linux x86_64 binary asset
+  ansible.builtin.set_fact:
+    opencode_asset: >-
+      {{ opencode_release.json.assets
+         | selectattr('name', 'search', opencode_asset_pattern)
+         | list | first | default({}) }}
+
+- name: Read installed opencode version marker
+  ansible.builtin.slurp:
+    src: "{{ ansible_version_dir }}/opencode"
+  register: opencode_version_file
+  failed_when: false
+
+- name: Install or update opencode
+  when: >
+    opencode_asset.browser_download_url is defined and
+    (opencode_version_file.failed or
+     (opencode_version_file.content | b64decode | trim) != opencode_latest)
+  block:
+    - name: Download opencode asset
+      ansible.builtin.get_url:
+        url: "{{ opencode_asset.browser_download_url }}"
+        dest: "/tmp/{{ opencode_asset.name }}"
+        mode: "0644"
+
+    - name: Extract opencode archive (tar.gz / tgz)
+      when: opencode_asset.name is search('\\.tar\\.gz$|\\.tgz$')
+      block:
+        - name: Create extraction directory
+          ansible.builtin.file:
+            path: /tmp/opencode_extract
+            state: directory
+            mode: "0755"
+
+        - name: Extract tar archive
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ opencode_asset.name }}"
+            dest: /tmp/opencode_extract
+            remote_src: true
+
+        - name: Install opencode binary from archive
+          ansible.builtin.shell: |
+            binary=$(find /tmp/opencode_extract -type f -name "opencode" | head -1)
+            if [ -z "$binary" ]; then
+              echo "ERROR: opencode binary not found in extracted archive" >&2
+              exit 1
+            fi
+            install -m 755 "$binary" "{{ opencode_install_dir }}/opencode"
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Clean up extraction directory
+          ansible.builtin.file:
+            path: /tmp/opencode_extract
+            state: absent
+
+    - name: Extract opencode archive (zip)
+      when: opencode_asset.name is search('\\.zip$')
+      block:
+        - name: Create extraction directory
+          ansible.builtin.file:
+            path: /tmp/opencode_extract
+            state: directory
+            mode: "0755"
+
+        - name: Extract zip archive
+          ansible.builtin.unarchive:
+            src: "/tmp/{{ opencode_asset.name }}"
+            dest: /tmp/opencode_extract
+            remote_src: true
+
+        - name: Install opencode binary from archive
+          ansible.builtin.shell: |
+            binary=$(find /tmp/opencode_extract -type f -name "opencode" | head -1)
+            if [ -z "$binary" ]; then
+              echo "ERROR: opencode binary not found in extracted archive" >&2
+              exit 1
+            fi
+            install -m 755 "$binary" "{{ opencode_install_dir }}/opencode"
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Clean up extraction directory
+          ansible.builtin.file:
+            path: /tmp/opencode_extract
+            state: absent
+
+    - name: Install opencode plain binary directly
+      when: not (opencode_asset.name is search('\\.(tar\\.gz|tgz|zip)$'))
+      ansible.builtin.copy:
+        src: "/tmp/{{ opencode_asset.name }}"
+        dest: "{{ opencode_install_dir }}/opencode"
+        remote_src: true
+        mode: "0755"
+
+    - name: Remove downloaded asset
+      ansible.builtin.file:
+        path: "/tmp/{{ opencode_asset.name }}"
+        state: absent
+
+    - name: Save installed opencode version marker
+      ansible.builtin.copy:
+        content: "{{ opencode_latest }}"
+        dest: "{{ ansible_version_dir }}/opencode"
+        mode: "0644"
+
+- name: Warn if no matching asset was found
+  ansible.builtin.debug:
+    msg: >
+      No Linux x86_64 asset found for opencode {{ opencode_latest }}.
+      Check https://github.com/{{ opencode_github_owner }}/{{ opencode_github_repo }}/releases
+      and adjust opencode_asset_pattern in roles/opencode/defaults/main.yml if needed.
+  when: opencode_asset.browser_download_url is not defined
