@@ -53,6 +53,7 @@
 
         - name: Install opencode binary from archive
           ansible.builtin.shell: |
+            set -o pipefail
             binary=$(find /tmp/opencode_extract -type f -name "opencode" | head -1)
             if [ -z "$binary" ]; then
               echo "ERROR: opencode binary not found in extracted archive" >&2
@@ -85,6 +86,7 @@
 
         - name: Install opencode binary from archive
           ansible.builtin.shell: |
+            set -o pipefail
             binary=$(find /tmp/opencode_extract -type f -name "opencode" | head -1)
             if [ -z "$binary" ]; then
               echo "ERROR: opencode binary not found in extracted archive" >&2

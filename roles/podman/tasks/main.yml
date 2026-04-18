@@ -2,5 +2,5 @@
 - name: Install podman
   ansible.builtin.apt:
     name: podman
-    state: latest
+    state: present
     update_cache: false

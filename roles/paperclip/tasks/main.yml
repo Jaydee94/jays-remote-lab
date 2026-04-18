@@ -14,7 +14,7 @@
       {{ (node_version_check.stdout | regex_search('v(\d+)', '\1') | first | int)
          if node_version_check.rc == 0 else 0 }}
 
-- name: Install Node.js {{ paperclip_node_version }} via NodeSource setup script
+- name: Install Node.js via NodeSource setup script (version {{ paperclip_node_version }})
   when: node_installed_major | int < paperclip_node_version | int
   block:
     - name: Download NodeSource setup script
@@ -136,11 +136,7 @@
     group: root
     mode: "0644"
   register: paperclip_service_changed
-
-- name: Reload systemd daemon when unit changed
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: paperclip_service_changed.changed
+  notify: Reload systemd daemon
 
 - name: Enable and start Paperclip service
   ansible.builtin.systemd:

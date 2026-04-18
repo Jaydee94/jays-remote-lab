@@ -21,7 +21,7 @@
   ansible.builtin.set_fact:
     llama_cpp_asset: >-
       {{ llama_cpp_release.json.assets
-         | selectattr('name', 'search', 'ubuntu.*x64')
+         | selectattr('name', 'search', 'ubuntu-x64\.tar\.gz$')
          | list | first | default({}) }}
 
 - name: Read installed llama.cpp version marker
@@ -65,28 +65,48 @@
         state: directory
         mode: "0755"
 
-    - name: Install llama.cpp executables to bin directory
+    - name: Install llama.cpp shared libraries to lib directory
       ansible.builtin.shell: |
-        find /tmp/llama_cpp_extract -type f \
-          \( -name "llama-cli" -o -name "llama-server" \
-             -o -name "llama-quantize" -o -name "llama-bench" \) | \
+        set -o pipefail
+        find /tmp/llama_cpp_extract -type f -name "*.so*" | grep -v openvino | \
         while read -r f; do
-          install -m 755 "$f" "{{ llama_cpp_install_dir }}/"
+          install -m 644 "$f" "{{ llama_cpp_lib_dir }}/"
         done
       args:
         executable: /bin/bash
       changed_when: true
 
-    - name: Install llama.cpp shared libraries
+    - name: Install llama.cpp executables into lib directory (needed for backend plugin discovery)
       ansible.builtin.shell: |
-        find /tmp/llama_cpp_extract -type f -name "*.so*" | \
+        set -o pipefail
+        find /tmp/llama_cpp_extract -type f \
+          \( -name "llama-cli" -o -name "llama-server" \
+             -o -name "llama-quantize" -o -name "llama-bench" \) | \
         while read -r f; do
-          install -m 644 "$f" "{{ llama_cpp_lib_dir }}/"
+          install -m 755 "$f" "{{ llama_cpp_lib_dir }}/"
         done
-        ldconfig
       args:
         executable: /bin/bash
       changed_when: true
+
+    - name: Create symlinks for llama.cpp executables in bin directory
+      ansible.builtin.file:
+        src: "{{ llama_cpp_lib_dir }}/{{ item }}"
+        dest: "{{ llama_cpp_install_dir }}/{{ item }}"
+        state: link
+        force: true
+      loop:
+        - llama-server
+        - llama-cli
+        - llama-quantize
+        - llama-bench
+
+    - name: Register llama-cpp lib directory with ldconfig
+      ansible.builtin.copy:
+        content: "{{ llama_cpp_lib_dir }}\n"
+        dest: /etc/ld.so.conf.d/llama-cpp.conf
+        mode: "0644"
+      notify: Run ldconfig
 
     - name: Clean up llama.cpp temporary files
       ansible.builtin.file:

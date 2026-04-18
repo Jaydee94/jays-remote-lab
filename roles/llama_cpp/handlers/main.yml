@@ -1,4 +1,8 @@
 ---
+- name: Run ldconfig
+  ansible.builtin.command: ldconfig
+  changed_when: false
+
 - name: Reload systemd
   ansible.builtin.systemd:
     daemon_reload: true

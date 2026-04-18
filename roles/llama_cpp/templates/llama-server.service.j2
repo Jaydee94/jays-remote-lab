@@ -7,7 +7,7 @@ Wants=network.target
 Type=simple
 User={{ llama_cpp_server_user }}
 Group={{ llama_cpp_server_user }}
-Environment=LD_LIBRARY_PATH={{ llama_cpp_lib_dir }}
+Environment=GGML_BACKEND_PATH={{ llama_cpp_lib_dir }}
 ExecStart={{ llama_cpp_install_dir }}/llama-server \
   --model {{ llama_cpp_model_dir }}/{{ llama_cpp_model_name }} \
   --alias {{ llama_cpp_server_model_alias }} \
