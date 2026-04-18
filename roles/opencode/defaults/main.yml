@@ -12,5 +12,5 @@ opencode_llama_host: 127.0.0.1
 opencode_llama_port: 8080
 opencode_llama_model_alias: qwen2.5-coder-7b
 opencode_llama_model_display_name: "Qwen2.5-Coder 7B Instruct (local)"
-opencode_llama_ctx_size: 8192
+opencode_llama_ctx_size: 32768
 opencode_llama_output_size: 4096

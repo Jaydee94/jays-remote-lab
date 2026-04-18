@@ -12,7 +12,7 @@ llama_cpp_model_url: "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF
 # llama-server configuration
 llama_cpp_server_host: 127.0.0.1
 llama_cpp_server_port: 8080
-llama_cpp_server_ctx_size: 8192
+llama_cpp_server_ctx_size: 32768
 llama_cpp_server_threads: -1
 llama_cpp_server_parallel: 2
 llama_cpp_server_model_alias: qwen2.5-coder-7b
