@@ -1,0 +1,6 @@
+---
+nginx_vhosts:
+  - name: paperclip
+    listen: 80
+    server_name: "_"
+    proxy_pass: "http://127.0.0.1:3100"

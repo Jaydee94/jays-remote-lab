@@ -6,6 +6,7 @@
   roles:
     - common      # apt update / upgrade + base dependencies
     - podman      # container runtime (apt)
+    - nginx       # reverse proxy (apt)
     - starship    # shell prompt (GitHub release binary)
     - llama_cpp   # local LLM inference (GitHub release binary)
     - opencode    # AI coding assistant (GitHub release binary)

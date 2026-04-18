@@ -6,7 +6,7 @@ paperclip_node_version: "20"
 paperclip_port: 3100
 
 # Public URL that Paperclip advertises (change to your domain / IP)
-paperclip_public_url: "http://{{ ansible_host }}:{{ paperclip_port }}"
+paperclip_public_url: "http://{{ ansible_host }}"
 
 # Data directory where Paperclip stores its embedded DB, uploads, etc.
 paperclip_data_dir: /opt/paperclip/data
