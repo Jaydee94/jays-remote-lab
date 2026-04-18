@@ -22,6 +22,8 @@
       - gnupg
       - lsb-release
       - build-essential
+      - ripgrep
+      - fzf
     state: present
 
 - name: Ensure ansible-versions directory exists

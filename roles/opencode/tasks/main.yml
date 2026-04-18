@@ -126,3 +126,21 @@
       Check https://github.com/{{ opencode_github_owner }}/{{ opencode_github_repo }}/releases
       and adjust opencode_asset_pattern in roles/opencode/defaults/main.yml if needed.
   when: opencode_asset.browser_download_url is not defined
+
+# --- opencode configuration ---
+
+- name: Ensure opencode config directory exists
+  ansible.builtin.file:
+    path: "{{ vps_home }}/.config/opencode"
+    state: directory
+    owner: "{{ vps_user }}"
+    group: "{{ vps_user }}"
+    mode: "0755"
+
+- name: Deploy opencode config (llama.cpp provider)
+  ansible.builtin.template:
+    src: opencode.json.j2
+    dest: "{{ vps_home }}/.config/opencode/opencode.json"
+    owner: "{{ vps_user }}"
+    group: "{{ vps_user }}"
+    mode: "0644"

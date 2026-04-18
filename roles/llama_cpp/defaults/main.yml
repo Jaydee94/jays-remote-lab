@@ -3,3 +3,17 @@ llama_cpp_github_owner: ggml-org
 llama_cpp_github_repo: llama.cpp
 llama_cpp_install_dir: /usr/local/bin
 llama_cpp_lib_dir: /usr/local/lib/llama-cpp
+
+# Model configuration
+llama_cpp_model_dir: /opt/llama-models
+llama_cpp_model_name: Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf
+llama_cpp_model_url: "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+
+# llama-server configuration
+llama_cpp_server_host: 127.0.0.1
+llama_cpp_server_port: 8080
+llama_cpp_server_ctx_size: 8192
+llama_cpp_server_threads: -1
+llama_cpp_server_parallel: 2
+llama_cpp_server_model_alias: qwen2.5-coder-7b
+llama_cpp_server_user: llama-server

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "llama.cpp/{{ opencode_llama_model_alias }}",
+  "default_agent": "build",
+  "provider": {
+    "llama.cpp": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "llama-server (local)",
+      "options": {
+        "baseURL": "http://{{ opencode_llama_host }}:{{ opencode_llama_port }}/v1"
+      },
+      "models": {
+        "{{ opencode_llama_model_alias }}": {
+          "name": "{{ opencode_llama_model_display_name }}",
+          "limit": {
+            "context": {{ opencode_llama_ctx_size }},
+            "output": {{ opencode_llama_output_size }}
+          }
+        }
+      }
+    }
+  },
+  "autoupdate": false
+}

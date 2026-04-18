@@ -109,3 +109,61 @@
       Check https://github.com/{{ llama_cpp_github_owner }}/{{ llama_cpp_github_repo }}/releases
       for available assets and adjust the search pattern in this role if needed.
   when: llama_cpp_asset.browser_download_url is not defined
+
+# --- Model ---
+
+- name: Ensure model directory exists
+  ansible.builtin.file:
+    path: "{{ llama_cpp_model_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Check if model file already exists
+  ansible.builtin.stat:
+    path: "{{ llama_cpp_model_dir }}/{{ llama_cpp_model_name }}"
+  register: llama_cpp_model_stat
+
+- name: Download Qwen2.5-Coder model (this may take a while)
+  ansible.builtin.get_url:
+    url: "{{ llama_cpp_model_url }}"
+    dest: "{{ llama_cpp_model_dir }}/{{ llama_cpp_model_name }}"
+    mode: "0644"
+    timeout: 3600
+  when: not llama_cpp_model_stat.stat.exists
+
+# --- Service user ---
+
+- name: Ensure llama-server system user exists
+  ansible.builtin.user:
+    name: "{{ llama_cpp_server_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ llama_cpp_model_dir }}"
+    create_home: false
+
+- name: Set ownership of model directory to service user
+  ansible.builtin.file:
+    path: "{{ llama_cpp_model_dir }}"
+    owner: "{{ llama_cpp_server_user }}"
+    group: "{{ llama_cpp_server_user }}"
+    recurse: true
+
+# --- Systemd service ---
+
+- name: Deploy llama-server systemd unit
+  ansible.builtin.template:
+    src: llama-server.service.j2
+    dest: /etc/systemd/system/llama-server.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart llama-server
+
+- name: Enable and start llama-server
+  ansible.builtin.systemd:
+    name: llama-server
+    enabled: true
+    state: started
+    daemon_reload: true

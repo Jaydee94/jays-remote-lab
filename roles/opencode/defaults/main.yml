@@ -1,7 +1,16 @@
 ---
-opencode_github_owner: opencode-ai
+opencode_github_owner: anomalyco
 opencode_github_repo: opencode
 opencode_install_dir: /usr/local/bin
 # Asset search pattern for the Linux amd64 binary.
-# Adjust if the release naming convention changes.
-opencode_asset_pattern: "linux.*x86_64"
+# anomalyco/opencode releases CLI binaries as opencode-linux-x86_64.tar.gz
+opencode_asset_pattern: 'opencode-linux-x64\.tar\.gz$'
+
+# llama.cpp provider configuration for opencode
+# These should match the llama_cpp role settings.
+opencode_llama_host: 127.0.0.1
+opencode_llama_port: 8080
+opencode_llama_model_alias: qwen2.5-coder-7b
+opencode_llama_model_display_name: "Qwen2.5-Coder 7B Instruct (local)"
+opencode_llama_ctx_size: 8192
+opencode_llama_output_size: 4096
