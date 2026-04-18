@@ -14,7 +14,7 @@ Jeder Playbook-Run hält Ubuntu und alle installierten Tools automatisch aktuell
 | **starship** | Schneller, hübscher Shell-Prompt | GitHub Releases |
 | **llama.cpp** | Lokale KI-Inferenz (LLMs lokal laufen lassen) | GitHub Releases |
 | **opencode** | KI-gestützter Coding-Assistent im Terminal | GitHub Releases |
-| **paperclip** | Clipboard-/Snippet-Tool | GitHub Releases |
+| **paperclip** | KI-Agenten-Orchestrierung – Self-hosted Web-App (Port 3100) | npm (paperclipai) |
 
 ---
 
@@ -117,16 +117,36 @@ llama_cpp_github_repo: llama.cpp
 llama_cpp_install_dir: /usr/local/bin
 ```
 
-### Paperclip – GitHub-Repo anpassen
+### Paperclip – Web-App konfigurieren
 
-Sollte das Standard-Repo für paperclip nicht passen, einfach in  
-`roles/paperclip/defaults/main.yml` das richtige Repo eintragen:
+**paperclipai/paperclip** ist eine Self-hosted Web-Applikation (KI-Agenten-Orchestrierung).  
+Sie läuft nach der Installation unter `http://<VPS-IP>:3100`.
+
+Wichtige Variablen in `roles/paperclip/defaults/main.yml`:
 
 ```yaml
-paperclip_github_owner: <org-oder-user>
-paperclip_github_repo: <repo-name>
-paperclip_asset_pattern: "linux.*amd64"
+paperclip_port: 3100
+paperclip_public_url: "http://85.215.129.251:3100"
+paperclip_data_dir: /opt/paperclip/data
 ```
+
+**Auth-Secret absichern (empfohlen):**  
+Beim ersten Lauf wird automatisch ein zufälliger Auth-Key generiert und in  
+`/opt/paperclip/data/.auth_secret` gespeichert. Du kannst ihn auch selbst setzen –  
+am besten via [Ansible Vault](https://docs.ansible.com/ansible/latest/vault_guide/):
+
+```bash
+# Secret generieren
+openssl rand -hex 32
+
+# Vault-verschlüsselt in group_vars/all.yml ablegen
+ansible-vault encrypt_string 'DEIN_GENERIERTES_SECRET' --name 'paperclip_better_auth_secret'
+```
+
+**Nach der Installation:**
+1. Browser öffnen: `http://85.215.129.251:3100`  
+2. Account anlegen (erster Account wird automatisch Admin)  
+3. Agenten konfigurieren
 
 ### Neues Tool hinzufügen
 
@@ -143,10 +163,15 @@ paperclip_asset_pattern: "linux.*amd64"
 
 ## Wie funktioniert die automatische Aktualisierung?
 
-Für Tools aus GitHub Releases:
+Für Tools aus GitHub Releases (starship, llama.cpp, opencode):
 1. Ansible fragt beim jeweiligen GitHub-Release-Endpunkt die aktuelle Version ab.
 2. In `/usr/local/share/ansible-versions/` wird die zuletzt installierte Version gespeichert.
 3. Weichen die Versionen voneinander ab, wird die neue Version heruntergeladen und installiert.
+
+Für paperclip (npm):
+1. Ansible fragt die npm-Registry nach der aktuellen Version von `paperclipai` ab.
+2. Ist die installierte Version veraltet, wird `npm install -g paperclipai@<version>` ausgeführt.
+3. Danach wird der systemd-Dienst `paperclip` automatisch neu gestartet.
 
 Für apt-Pakete (Ubuntu, podman) wird bei jedem Lauf `apt dist-upgrade` ausgeführt.
 
@@ -171,3 +196,20 @@ Task „Find Ubuntu x64 binary asset" an.
 
 **Starship wird installiert, aber ich sehe es nicht im Terminal.**  
 → Starte eine neue SSH-Session oder führe `source ~/.bashrc` aus.
+
+**Paperclip ist unter Port 3100 nicht erreichbar.**  
+→ Prüfe ob der Dienst läuft:
+```bash
+ssh jaydee@85.215.129.251 "systemctl status paperclip"
+```
+Logs anzeigen:
+```bash
+ssh jaydee@85.215.129.251 "journalctl -u paperclip -n 50"
+```
+
+**Ich möchte Paperclip hinter einem Reverse Proxy (nginx/caddy) betreiben.**  
+→ Setze `paperclip_public_url` in `group_vars/all.yml` auf deine Domain:
+```yaml
+paperclip_public_url: "https://paperclip.meinedomain.de"
+```
+

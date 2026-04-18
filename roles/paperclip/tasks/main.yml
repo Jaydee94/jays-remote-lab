@@ -1,128 +1,155 @@
 ---
-- name: Get latest paperclip release from GitHub
-  ansible.builtin.uri:
-    url: "https://api.github.com/repos/{{ paperclip_github_owner }}/{{ paperclip_github_repo }}/releases/latest"
-    headers:
-      Accept: "application/vnd.github.v3+json"
-      User-Agent: "ansible-jays-remote-lab"
-  register: paperclip_release
-
-- name: Set paperclip latest version fact
-  ansible.builtin.set_fact:
-    paperclip_latest: "{{ paperclip_release.json.tag_name }}"
-
-- name: Find Linux binary asset
-  ansible.builtin.set_fact:
-    paperclip_asset: >-
-      {{ paperclip_release.json.assets
-         | selectattr('name', 'search', paperclip_asset_pattern)
-         | list | first | default({}) }}
-
-- name: Read installed paperclip version marker
-  ansible.builtin.slurp:
-    src: "{{ ansible_version_dir }}/paperclip"
-  register: paperclip_version_file
+# ──────────────────────────────────────────────
+# 1. Node.js 20 via NodeSource
+# ──────────────────────────────────────────────
+- name: Check if Node.js is already installed
+  ansible.builtin.command: node --version
+  register: node_version_check
+  changed_when: false
   failed_when: false
 
-- name: Install or update paperclip
-  when: >
-    paperclip_asset.browser_download_url is defined and
-    (paperclip_version_file.failed or
-     (paperclip_version_file.content | b64decode | trim) != paperclip_latest)
+- name: Check installed Node.js major version
+  ansible.builtin.set_fact:
+    node_installed_major: >-
+      {{ (node_version_check.stdout | regex_search('v(\d+)', '\1') | first | int)
+         if node_version_check.rc == 0 else 0 }}
+
+- name: Install Node.js {{ paperclip_node_version }} via NodeSource setup script
+  when: node_installed_major | int < paperclip_node_version | int
   block:
-    - name: Download paperclip asset
+    - name: Download NodeSource setup script
       ansible.builtin.get_url:
-        url: "{{ paperclip_asset.browser_download_url }}"
-        dest: "/tmp/{{ paperclip_asset.name }}"
-        mode: "0644"
+        url: "https://deb.nodesource.com/setup_{{ paperclip_node_version }}.x"
+        dest: /tmp/nodesource_setup.sh
+        mode: "0700"
 
-    - name: Extract paperclip archive (tar.gz / tgz)
-      when: paperclip_asset.name is search('\\.tar\\.gz$|\\.tgz$')
-      block:
-        - name: Create extraction directory
-          ansible.builtin.file:
-            path: /tmp/paperclip_extract
-            state: directory
-            mode: "0755"
+    - name: Run NodeSource setup script
+      ansible.builtin.command: bash /tmp/nodesource_setup.sh
+      changed_when: true
 
-        - name: Extract tar archive
-          ansible.builtin.unarchive:
-            src: "/tmp/{{ paperclip_asset.name }}"
-            dest: /tmp/paperclip_extract
-            remote_src: true
+    - name: Install nodejs package
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
 
-        - name: Install paperclip binary from archive
-          ansible.builtin.shell: |
-            binary=$(find /tmp/paperclip_extract -type f -name "paperclip" | head -1)
-            if [ -z "$binary" ]; then
-              echo "ERROR: paperclip binary not found in extracted archive" >&2
-              exit 1
-            fi
-            install -m 755 "$binary" "{{ paperclip_install_dir }}/paperclip"
-          args:
-            executable: /bin/bash
-          changed_when: true
-
-        - name: Clean up extraction directory
-          ansible.builtin.file:
-            path: /tmp/paperclip_extract
-            state: absent
-
-    - name: Extract paperclip archive (zip)
-      when: paperclip_asset.name is search('\\.zip$')
-      block:
-        - name: Create extraction directory
-          ansible.builtin.file:
-            path: /tmp/paperclip_extract
-            state: directory
-            mode: "0755"
-
-        - name: Extract zip archive
-          ansible.builtin.unarchive:
-            src: "/tmp/{{ paperclip_asset.name }}"
-            dest: /tmp/paperclip_extract
-            remote_src: true
-
-        - name: Install paperclip binary from archive
-          ansible.builtin.shell: |
-            binary=$(find /tmp/paperclip_extract -type f -name "paperclip" | head -1)
-            if [ -z "$binary" ]; then
-              echo "ERROR: paperclip binary not found in extracted archive" >&2
-              exit 1
-            fi
-            install -m 755 "$binary" "{{ paperclip_install_dir }}/paperclip"
-          args:
-            executable: /bin/bash
-          changed_when: true
-
-        - name: Clean up extraction directory
-          ansible.builtin.file:
-            path: /tmp/paperclip_extract
-            state: absent
-
-    - name: Install paperclip plain binary directly
-      when: not (paperclip_asset.name is search('\\.(tar\\.gz|tgz|zip)$'))
-      ansible.builtin.copy:
-        src: "/tmp/{{ paperclip_asset.name }}"
-        dest: "{{ paperclip_install_dir }}/paperclip"
-        remote_src: true
-        mode: "0755"
-
-    - name: Remove downloaded asset
+    - name: Remove NodeSource setup script
       ansible.builtin.file:
-        path: "/tmp/{{ paperclip_asset.name }}"
+        path: /tmp/nodesource_setup.sh
         state: absent
 
-    - name: Save installed paperclip version marker
-      ansible.builtin.copy:
-        content: "{{ paperclip_latest }}"
-        dest: "{{ ansible_version_dir }}/paperclip"
-        mode: "0644"
+# ──────────────────────────────────────────────
+# 2. Install / update paperclipai npm package
+# ──────────────────────────────────────────────
+- name: Get currently installed paperclipai version
+  ansible.builtin.command: npm list -g --depth=0 paperclipai
+  register: paperclip_installed_check
+  changed_when: false
+  failed_when: false
 
-- name: Warn if no matching asset was found
-  ansible.builtin.debug:
-    msg: >
-      No Linux asset found for paperclip {{ paperclip_latest }}.
-      Check https://github.com/{{ paperclip_github_owner }}/{{ paperclip_github_repo }}/releases
-      and adjust paperclip_asset_pattern in roles/paperclip/defaults/main.yml if needed.
-  when: paperclip_asset.browser_download_url is not defined
+- name: Get latest paperclipai version from npm registry
+  ansible.builtin.uri:
+    url: https://registry.npmjs.org/paperclipai/latest
+    headers:
+      Accept: "application/json"
+  register: paperclip_npm_latest
+
+- name: Set latest paperclipai version fact
+  ansible.builtin.set_fact:
+    paperclip_latest_version: "{{ paperclip_npm_latest.json.version }}"
+
+- name: Determine if paperclipai needs install or update
+  ansible.builtin.set_fact:
+    paperclip_needs_update: >-
+      {{ paperclip_latest_version not in (paperclip_installed_check.stdout | default('')) }}
+
+- name: Install or update paperclipai to latest version
+  ansible.builtin.command: "npm install -g paperclipai@{{ paperclip_latest_version }}"
+  when: paperclip_needs_update | bool
+  register: paperclip_npm_install
+  changed_when: true
+
+# ──────────────────────────────────────────────
+# 3. Data directory and configuration
+# ──────────────────────────────────────────────
+- name: Create Paperclip data directory
+  ansible.builtin.file:
+    path: "{{ paperclip_data_dir }}"
+    state: directory
+    owner: "{{ paperclip_user }}"
+    group: "{{ paperclip_group }}"
+    mode: "0750"
+
+- name: Read existing auth secret (if present)
+  ansible.builtin.slurp:
+    src: "{{ paperclip_data_dir }}/.auth_secret"
+  register: paperclip_existing_secret
+  failed_when: false
+
+- name: Generate a random auth secret when none is configured
+  ansible.builtin.set_fact:
+    paperclip_generated_secret: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}"
+  when:
+    - paperclip_better_auth_secret == ""
+    - paperclip_existing_secret.failed
+
+- name: Persist generated auth secret so future runs stay consistent
+  ansible.builtin.copy:
+    content: "{{ paperclip_generated_secret }}"
+    dest: "{{ paperclip_data_dir }}/.auth_secret"
+    owner: "{{ paperclip_user }}"
+    group: "{{ paperclip_group }}"
+    mode: "0600"
+  when:
+    - paperclip_better_auth_secret == ""
+    - paperclip_existing_secret.failed
+
+- name: Resolve effective auth secret
+  ansible.builtin.set_fact:
+    paperclip_better_auth_secret_resolved: >-
+      {{
+        paperclip_better_auth_secret
+        if paperclip_better_auth_secret != ''
+        else (paperclip_generated_secret
+              if (paperclip_existing_secret.failed | default(true))
+              else (paperclip_existing_secret.content | b64decode | trim))
+      }}
+
+- name: Write Paperclip environment file
+  ansible.builtin.template:
+    src: paperclip.env.j2
+    dest: "{{ paperclip_data_dir }}/.env"
+    owner: "{{ paperclip_user }}"
+    group: "{{ paperclip_group }}"
+    mode: "0600"
+  register: paperclip_env_changed
+  no_log: true
+
+# ──────────────────────────────────────────────
+# 4. Systemd service
+# ──────────────────────────────────────────────
+- name: Deploy Paperclip systemd service unit
+  ansible.builtin.template:
+    src: paperclip.service.j2
+    dest: /etc/systemd/system/paperclip.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: paperclip_service_changed
+
+- name: Reload systemd daemon when unit changed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: paperclip_service_changed.changed
+
+- name: Enable and start Paperclip service
+  ansible.builtin.systemd:
+    name: paperclip
+    enabled: true
+    state: started
+
+- name: Restart Paperclip when package or config changed
+  ansible.builtin.systemd:
+    name: paperclip
+    state: restarted
+  when: (paperclip_needs_update | bool) or paperclip_env_changed.changed

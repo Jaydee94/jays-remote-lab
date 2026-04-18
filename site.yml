@@ -9,4 +9,4 @@
     - starship    # shell prompt (GitHub release binary)
     - llama_cpp   # local LLM inference (GitHub release binary)
     - opencode    # AI coding assistant (GitHub release binary)
-    - paperclip   # clipboard / snippet tool (GitHub release binary)
+    - paperclip   # AI agent orchestration web app (npm package: paperclipai)
