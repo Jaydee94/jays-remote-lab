@@ -1,21 +1,19 @@
----
 # ──────────────────────────────────────────────
 # 1. Node.js 20 via NodeSource
 # ──────────────────────────────────────────────
-- name: Check if Node.js is already installed
+- name: Check installed Node.js version
   ansible.builtin.command: node --version
   register: node_version_check
   changed_when: false
   failed_when: false
 
-- name: Check installed Node.js major version
+- name: Set installed Node.js major version fact
   ansible.builtin.set_fact:
     node_installed_major: >-
-      {{ (node_version_check.stdout | regex_search('v(\d+)', '\1') | first | int)
+      {{ node_version_check.stdout.split('.')[0] | regex_replace('[^0-9]', '') | int
          if node_version_check.rc == 0 else 0 }}
 
 - name: Install Node.js via NodeSource setup script (version {{ paperclip_node_version }})
-  when: node_installed_major | int < paperclip_node_version | int
   block:
     - name: Download NodeSource setup script
       ansible.builtin.get_url:
@@ -37,6 +35,7 @@
       ansible.builtin.file:
         path: /tmp/nodesource_setup.sh
         state: absent
+  when: node_installed_major | int < paperclip_node_version | int
 
 # ──────────────────────────────────────────────
 # 2. Install / update paperclipai npm package
@@ -45,7 +44,6 @@
   ansible.builtin.command: npm list -g --depth=0 paperclipai
   register: paperclip_installed_check
   changed_when: false
-  failed_when: false
 
 - name: Get latest paperclipai version from npm registry
   ansible.builtin.uri:
@@ -125,6 +123,23 @@
   register: paperclip_env_changed
   no_log: true
 
+- name: Create instances/default directory
+  ansible.builtin.file:
+    path: "{{ paperclip_data_dir }}/instances/default"
+    state: directory
+    owner: "{{ paperclip_user }}"
+    group: "{{ paperclip_group }}"
+    mode: "0750"
+
+- name: Write Paperclip config.json
+  ansible.builtin.template:
+    src: paperclip.config.json.j2
+    dest: "{{ paperclip_data_dir }}/instances/default/config.json"
+    owner: "{{ paperclip_user }}"
+    group: "{{ paperclip_group }}"
+    mode: "0644"
+  register: paperclip_config_changed
+
 # ──────────────────────────────────────────────
 # 4. Systemd service
 # ──────────────────────────────────────────────
@@ -148,4 +163,22 @@
   ansible.builtin.systemd:
     name: paperclip
     state: restarted
-  when: (paperclip_needs_update | bool) or paperclip_env_changed.changed
+  when: (paperclip_needs_update | bool) or paperclip_env_changed.changed or paperclip_config_changed.changed
+
+# ──────────────────────────────────────────────
+# 5. Bootstrap first admin (authenticated mode)
+# ──────────────────────────────────────────────
+- name: Check if any admin user exists
+  ansible.builtin.command: >
+    paperclipai auth bootstrap-ceo
+  become_user: "{{ paperclip_user }}"
+  register: paperclip_bootstrap
+  changed_when: "'invite' in paperclip_bootstrap.stdout | lower"
+  failed_when: false
+  environment:
+    PAPERCLIP_HOME: "{{ paperclip_data_dir }}"
+
+- name: Show bootstrap invite URL (copy this into your browser)
+  ansible.builtin.debug:
+    msg: "{{ paperclip_bootstrap.stdout }}"
+  when: "'invite' in paperclip_bootstrap.stdout | lower"

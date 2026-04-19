@@ -1,0 +1,58 @@
+{
+  "$meta": {
+    "version": 1,
+    "updatedAt": "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime(ansible_date_time.epoch) }}",
+    "source": "configure"
+  },
+  "database": {
+    "mode": "embedded-postgres",
+    "embeddedPostgresDataDir": "{{ paperclip_data_dir }}/instances/default/db",
+    "embeddedPostgresPort": 54329,
+    "backup": {
+      "enabled": true,
+      "intervalMinutes": 60,
+      "retentionDays": 30,
+      "dir": "{{ paperclip_data_dir }}/instances/default/data/backups"
+    }
+  },
+  "logging": {
+    "mode": "file",
+    "logDir": "{{ paperclip_data_dir }}/instances/default/logs"
+  },
+  "server": {
+    "deploymentMode": "authenticated",
+    "exposure": "public",
+    "bind": "lan",
+    "host": "0.0.0.0",
+    "port": {{ paperclip_port }},
+    "allowedHostnames": [],
+    "serveUi": true
+  },
+  "auth": {
+    "baseUrlMode": "explicit",
+    "publicBaseUrl": "{{ paperclip_public_url }}",
+    "disableSignUp": false
+  },
+  "telemetry": {
+    "enabled": true
+  },
+  "storage": {
+    "provider": "local_disk",
+    "localDisk": {
+      "baseDir": "{{ paperclip_data_dir }}/instances/default/data/storage"
+    },
+    "s3": {
+      "bucket": "paperclip",
+      "region": "us-east-1",
+      "prefix": "",
+      "forcePathStyle": false
+    }
+  },
+  "secrets": {
+    "provider": "local_encrypted",
+    "strictMode": false,
+    "localEncrypted": {
+      "keyFilePath": "{{ paperclip_data_dir }}/instances/default/secrets/master.key"
+    }
+  }
+}
